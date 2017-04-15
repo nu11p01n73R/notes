@@ -28,6 +28,12 @@ func initNotes() (string, error) {
 		return "", err
 	}
 
+	dataDir := noteDir + "/data"
+	err = createDir(dataDir)
+	if err != nil {
+		return "", err
+	}
+
 	return noteDir, nil
 }
 
