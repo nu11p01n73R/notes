@@ -94,15 +94,15 @@ func parseTags(tags string) []string {
 	return output
 }
 
-func parseNote(note string) {
-	file, err := os.Open(note)
-	if err != nil {
-		// return the error
-		return
-	}
-
+func parseNote(note string) (string, []string, error) {
 	var key, title string
 	tags := []string{}
+
+	file, err := os.Open(note)
+	if err != nil {
+		return title, tags, err
+	}
+
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -113,7 +113,6 @@ func parseNote(note string) {
 			continue
 		}
 
-		fmt.Println(key, line, len(line))
 		switch key {
 		case "[TITLE]":
 			title = line
@@ -124,22 +123,21 @@ func parseNote(note string) {
 		}
 	}
 
-	fmt.Println(title, tags)
+	return normalizeString(title), tags, nil
 }
 
-func saveNewNote(noteDir string) error {
-	today := time.Now().Format("2006010")
-	fileName := "test"
-	outputFile := fmt.Sprintf("%s/%s/%s", noteDir, today, fileName)
+func saveNewNote(noteDir, fileName string) error {
+	today := time.Now().Format("20060102")
+
+	outputDir := fmt.Sprintf("%s/data/%s", noteDir, today)
+	createDir(outputDir)
+	outputFile := fmt.Sprintf("%s/%s", outputDir, fileName)
 
 	return os.Rename(noteDir+"/.new", outputFile)
 }
 
 func newNote(noteDir string) error {
 	newNote := noteDir + "/.new"
-	parseNote(newNote)
-	return nil
-
 	err := createNote(newNote)
 	if err != nil {
 		return err
@@ -150,8 +148,13 @@ func newNote(noteDir string) error {
 		return err
 	}
 
-	parseNote(newNote)
-	return nil
+	title, _, err := parseNote(newNote)
+	if err != nil {
+		return err
+	}
+
+	err = saveNewNote(noteDir, title)
+	return err
 }
 
 func parseCommands(noteDir string) error {
