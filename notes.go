@@ -60,7 +60,7 @@ func newNoteTemplate() []byte {
 }
 
 func createNote(newFile string) error {
-	file, err := os.OpenFile(newFile, os.O_CREATE|os.O_WRONLY, 0755)
+	file, err := os.OpenFile(newFile, os.O_CREATE|os.O_WRONLY, 0754)
 	if err != nil {
 		return err
 	}
@@ -126,14 +126,38 @@ func parseNote(note string) (string, []string, error) {
 	return normalizeString(title), tags, nil
 }
 
-func saveNewNote(noteDir, fileName string) error {
+func saveNewNote(noteDir, fileName string) (string, error) {
 	today := time.Now().Format("20060102")
 
 	outputDir := fmt.Sprintf("%s/data/%s", noteDir, today)
 	createDir(outputDir)
 	outputFile := fmt.Sprintf("%s/%s", outputDir, fileName)
 
-	return os.Rename(noteDir+"/.new", outputFile)
+	err := os.Rename(noteDir+"/.new", outputFile)
+	return outputFile, err
+}
+
+func saveTag(tagFile, noteFile string) error {
+	file, err := os.OpenFile(tagFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0754)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write([]byte(noteFile + "\n"))
+	return err
+}
+
+func indexTags(noteDir, noteFile string, tags []string) error {
+	tagDir := noteDir + "/tags"
+
+	for _, tag := range tags {
+		tagFile := fmt.Sprintf("%s/%s", tagDir, tag)
+		err := saveTag(tagFile, noteFile)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func newNote(noteDir string) error {
@@ -148,7 +172,7 @@ func newNote(noteDir string) error {
 		return err
 	}
 
-	title, _, err := parseNote(newNote)
+	title, tags, err := parseNote(newNote)
 	if err != nil {
 		return err
 	}
@@ -159,7 +183,12 @@ func newNote(noteDir string) error {
 		return errors.New("Empty title. Skipping the note...")
 	}
 
-	err = saveNewNote(noteDir, title)
+	noteFile, err := saveNewNote(noteDir, title)
+	if err != nil {
+		return err
+	}
+
+	err = indexTags(noteDir, noteFile, tags)
 	return err
 }
 
