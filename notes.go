@@ -153,6 +153,12 @@ func newNote(noteDir string) error {
 		return err
 	}
 
+	// Ignore the file with no title
+	// assuming that the file is empty
+	if len(title) == 0 {
+		return errors.New("Empty title. Skipping the note...")
+	}
+
 	err = saveNewNote(noteDir, title)
 	return err
 }
