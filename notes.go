@@ -147,6 +147,10 @@ func saveTag(tagFile, noteFile string) error {
 	return err
 }
 
+// TODO add go routines to add tags
+// TODO Maybe we can save only the note file, and not the entire
+// path. This can save us few bytes. Provided that we can
+// always construct the path back as we know the noteDir
 func indexTags(noteDir, noteFile string, tags []string) error {
 	tagDir := noteDir + "/tags"
 
@@ -192,6 +196,75 @@ func newNote(noteDir string) error {
 	return err
 }
 
+func removeTag(tagFile, noteFile string) error {
+	tempFileName := tagFile + ".tmp"
+	tempFile, err := os.OpenFile(tempFileName, os.O_CREATE|os.O_WRONLY, 0754)
+	if err != nil {
+		return err
+	}
+	defer tempFile.Close()
+
+	file, err := os.Open(tagFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	writter := bufio.NewWriter(tempFile)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line != noteFile {
+			_, err := writter.Write([]byte(line + "\n"))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	err = writter.Flush()
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(tempFileName, tagFile)
+	return err
+}
+
+// TODO add go routine to remove the files.
+func deindexTags(noteDir, noteFile string, tags []string) error {
+	tagDir := noteDir + "/tags"
+
+	for _, tag := range tags {
+		tagFile := fmt.Sprintf("%s/%s", tagDir, tag)
+		err := removeTag(tagFile, noteFile)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeNote(noteDir, note string) error {
+	noteFile := fmt.Sprintf("%s/data/%s", noteDir, note)
+
+	_, err := os.Stat(noteFile)
+	if err != nil {
+		return errors.New("Cannot find note.")
+	}
+
+	_, tags, err := parseNote(noteFile)
+	if err != nil {
+		return err
+	}
+	err = deindexTags(noteDir, noteFile, tags)
+	if err != nil {
+		return err
+	}
+
+	err = os.Remove(noteFile)
+	return err
+}
+
 func parseCommands(noteDir string) error {
 	if len(os.Args) == 1 {
 		return errors.New("Not enough arguments")
@@ -202,6 +275,13 @@ func parseCommands(noteDir string) error {
 	switch cmd {
 	case "add":
 		err = newNote(noteDir)
+		break
+	case "remove":
+		if len(os.Args) != 3 {
+			err = errors.New("No note file specified")
+			break
+		}
+		err = removeNote(noteDir, os.Args[2])
 		break
 	default:
 		err = errors.New("Unknown command")
