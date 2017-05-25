@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+var noteDir string
+
 func createDir(fileName string) error {
 	_, err := os.Stat(fileName)
 	if os.IsNotExist(err) {
@@ -19,6 +21,10 @@ func createDir(fileName string) error {
 	}
 
 	return err
+}
+
+func copyFile(src, dest string) {
+
 }
 
 func initNotes() (string, error) {
@@ -126,7 +132,7 @@ func parseNote(note string) (string, []string, error) {
 	return normalizeString(title), tags, nil
 }
 
-func saveNewNote(noteDir, fileName string) (string, error) {
+func saveNewNote(fileName string) (string, error) {
 	today := time.Now().Format("20060102")
 
 	outputDir := fmt.Sprintf("%s/data/%s", noteDir, today)
@@ -151,7 +157,7 @@ func saveTag(tagFile, noteFile string) error {
 // TODO Maybe we can save only the note file, and not the entire
 // path. This can save us few bytes. Provided that we can
 // always construct the path back as we know the noteDir
-func indexTags(noteDir, noteFile string, tags []string) error {
+func indexTags(noteFile string, tags []string) error {
 	tagDir := noteDir + "/tags"
 
 	for _, tag := range tags {
@@ -164,7 +170,7 @@ func indexTags(noteDir, noteFile string, tags []string) error {
 	return nil
 }
 
-func newNote(noteDir string) error {
+func newNote() error {
 	newNote := noteDir + "/.new"
 	err := createNote(newNote)
 	if err != nil {
@@ -187,12 +193,12 @@ func newNote(noteDir string) error {
 		return errors.New("Empty title. Skipping the note...")
 	}
 
-	noteFile, err := saveNewNote(noteDir, title)
+	noteFile, err := saveNewNote(title)
 	if err != nil {
 		return err
 	}
 
-	err = indexTags(noteDir, noteFile, tags)
+	err = indexTags(noteFile, tags)
 	return err
 }
 
@@ -231,7 +237,7 @@ func removeTag(tagFile, noteFile string) error {
 }
 
 // TODO add go routine to remove the files.
-func deindexTags(noteDir, noteFile string, tags []string) error {
+func deindexTags(noteFile string, tags []string) error {
 	tagDir := noteDir + "/tags"
 
 	for _, tag := range tags {
@@ -244,7 +250,7 @@ func deindexTags(noteDir, noteFile string, tags []string) error {
 	return nil
 }
 
-func removeNote(noteDir, note string) error {
+func removeNote(note string) error {
 	noteFile := fmt.Sprintf("%s/data/%s", noteDir, note)
 
 	_, err := os.Stat(noteFile)
@@ -256,7 +262,7 @@ func removeNote(noteDir, note string) error {
 	if err != nil {
 		return err
 	}
-	err = deindexTags(noteDir, noteFile, tags)
+	err = deindexTags(noteFile, tags)
 	if err != nil {
 		return err
 	}
@@ -265,7 +271,11 @@ func removeNote(noteDir, note string) error {
 	return err
 }
 
-func parseCommands(noteDir string) error {
+func editNote(note string) error {
+	return nil
+}
+
+func parseCommands() error {
 	if len(os.Args) == 1 {
 		return errors.New("Not enough arguments")
 	}
@@ -274,14 +284,17 @@ func parseCommands(noteDir string) error {
 	cmd := os.Args[1]
 	switch cmd {
 	case "add":
-		err = newNote(noteDir)
+		err = newNote()
 		break
 	case "remove":
 		if len(os.Args) != 3 {
 			err = errors.New("No note file specified")
 			break
 		}
-		err = removeNote(noteDir, os.Args[2])
+		err = removeNote(os.Args[2])
+		break
+	case "edit":
+		err = editNote(noteDir, os.Args[2])
 		break
 	default:
 		err = errors.New("Unknown command")
@@ -297,9 +310,10 @@ func checkError(err error) {
 }
 
 func main() {
-	noteDir, err := initNotes()
+	var err error
+	noteDir, err = initNotes()
 	checkError(err)
 
-	err = parseCommands(noteDir)
+	err = parseCommands()
 	checkError(err)
 }
