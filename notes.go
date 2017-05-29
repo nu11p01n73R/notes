@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
@@ -12,6 +13,30 @@ import (
 )
 
 var noteDir string
+
+func getUserHome() (string, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+
+	return usr.HomeDir, nil
+}
+
+func listDiff(list1, list2 []string) []string {
+	hash := map[string]bool{}
+	for _, str := range list2 {
+		hash[str] = true
+	}
+
+	output := []string{}
+	for _, str := range list1 {
+		if _, found := hash[str]; !found {
+			output = append(output, str)
+		}
+	}
+	return output
+}
 
 func createDir(fileName string) error {
 	_, err := os.Stat(fileName)
@@ -23,17 +48,30 @@ func createDir(fileName string) error {
 	return err
 }
 
-func copyFile(src, dest string) {
+func copyFile(src, dest string) error {
+	input, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer input.Close()
 
+	output, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+
+	_, err = io.Copy(output, input)
+	return err
 }
 
 func initNotes() (string, error) {
-	usr, err := user.Current()
+	home, err := getUserHome()
 	if err != nil {
 		return "", err
 	}
 
-	noteDir := usr.HomeDir + "/.notes"
+	noteDir := home + "/.notes"
 	err = createDir(noteDir)
 	if err != nil {
 		return "", err
@@ -193,6 +231,11 @@ func newNote() error {
 		return errors.New("Empty title. Skipping the note...")
 	}
 
+	err = save(title, tags)
+	return err
+}
+
+func save(title string, tags []string) error {
 	noteFile, err := saveNewNote(title)
 	if err != nil {
 		return err
@@ -262,17 +305,65 @@ func removeNote(note string) error {
 	if err != nil {
 		return err
 	}
-	err = deindexTags(noteFile, tags)
+
+	err = remove(noteFile, tags)
+	return err
+}
+
+func remove(note string, tags []string) error {
+	err := deindexTags(note, tags)
 	if err != nil {
 		return err
 	}
 
-	err = os.Remove(noteFile)
+	err = os.Remove(note)
 	return err
 }
 
 func editNote(note string) error {
-	return nil
+	var err error
+
+	note = fmt.Sprintf("%s/data/%s", noteDir, note)
+	tempFile := noteDir + "/.new"
+	err = copyFile(note, tempFile)
+	if err != nil {
+		return err
+	}
+
+	openEditor(tempFile)
+
+	newTitle, newTags, err := parseNote(tempFile)
+	if err != nil {
+		return err
+	}
+
+	oldTitle, oldTags, err := parseNote(note)
+	if err != nil {
+		return err
+	}
+
+	if oldTitle != newTitle {
+		err = save(newTitle, newTags)
+		if err != nil {
+			return err
+		}
+		err = remove(note, oldTags)
+
+		err = nil
+	} else {
+		toAdd := listDiff(newTags, oldTags)
+		toRemove := listDiff(oldTags, newTags)
+
+		if len(toAdd) > 0 || len(toRemove) > 0 {
+			os.Rename(tempFile, note)
+
+			indexTags(note, toAdd)
+			deindexTags(note, toRemove)
+		}
+
+		err = nil
+	}
+	return err
 }
 
 func parseCommands() error {
@@ -294,7 +385,7 @@ func parseCommands() error {
 		err = removeNote(os.Args[2])
 		break
 	case "edit":
-		err = editNote(noteDir, os.Args[2])
+		err = editNote(os.Args[2])
 		break
 	default:
 		err = errors.New("Unknown command")
