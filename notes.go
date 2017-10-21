@@ -173,13 +173,15 @@ func parseNote(note string) (string, []string, error) {
 
 func saveNewNote(fileName string) (string, error) {
 	today := time.Now().Format("20060102")
+	note := fmt.Sprintf("%s/%s", today, fileName)
 
 	outputDir := fmt.Sprintf("%s/data/%s", noteDir, today)
 	createDir(outputDir)
-	outputFile := fmt.Sprintf("%s/%s", outputDir, fileName)
 
+	outputFile := fmt.Sprintf("%s/%s", outputDir, fileName)
 	err := os.Rename(noteDir+"/.new", outputFile)
-	return outputFile, err
+
+	return note, err
 }
 
 func saveTag(tagFile, noteFile string) error {
@@ -193,9 +195,6 @@ func saveTag(tagFile, noteFile string) error {
 }
 
 // TODO add go routines to add tags
-// TODO Maybe we can save only the note file, and not the entire
-// path. This can save us few bytes. Provided that we can
-// always construct the path back as we know the noteDir
 func indexTags(noteFile string, tags []string) error {
 	tagDir := noteDir + "/tags"
 
@@ -307,7 +306,12 @@ func removeNote(note string) error {
 		return err
 	}
 
-	err = remove(noteFile, tags)
+	err = deindexTags(note, tags)
+	if err != nil {
+		return err
+	}
+
+	err = os.Remove(noteFile)
 	return err
 }
 
@@ -324,9 +328,9 @@ func remove(note string, tags []string) error {
 func editNote(note string) error {
 	var err error
 
-	note = fmt.Sprintf("%s/data/%s", noteDir, note)
+	noteFile := fmt.Sprintf("%s/data/%s", noteDir, note)
 	tempFile := noteDir + "/.new"
-	err = copyFile(note, tempFile)
+	err = copyFile(noteFile, tempFile)
 	if err != nil {
 		return err
 	}
@@ -338,7 +342,7 @@ func editNote(note string) error {
 		return err
 	}
 
-	oldTitle, oldTags, err := parseNote(note)
+	oldTitle, oldTags, err := parseNote(noteFile)
 	if err != nil {
 		return err
 	}
@@ -348,9 +352,13 @@ func editNote(note string) error {
 		if err != nil {
 			return err
 		}
-		err = remove(note, oldTags)
 
-		err = nil
+		err = deindexTags(note, oldTags)
+		if err != nil {
+			return err
+		}
+
+		err = os.Remove(noteFile)
 	} else {
 		toAdd := listDiff(newTags, oldTags)
 		toRemove := listDiff(oldTags, newTags)
@@ -359,7 +367,7 @@ func editNote(note string) error {
 			indexTags(note, toAdd)
 			deindexTags(note, toRemove)
 		}
-		os.Rename(tempFile, note)
+		os.Rename(tempFile, noteFile)
 
 		err = nil
 	}
