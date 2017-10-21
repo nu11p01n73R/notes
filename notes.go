@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"github.com/nu11p01n73R/fuz/src"
 	"io"
 	"os"
 	"os/exec"
@@ -355,15 +356,22 @@ func editNote(note string) error {
 		toRemove := listDiff(oldTags, newTags)
 
 		if len(toAdd) > 0 || len(toRemove) > 0 {
-			os.Rename(tempFile, note)
-
 			indexTags(note, toAdd)
 			deindexTags(note, toRemove)
 		}
+		os.Rename(tempFile, note)
 
 		err = nil
 	}
 	return err
+}
+
+func listNotes() error {
+	dataDir := fmt.Sprintf("%s/data", noteDir)
+	cmd := exec.Command("./notes", "edit")
+
+	fuz.Fuz(dataDir, "Notes", cmd)
+	return nil
 }
 
 func parseCommands() error {
@@ -386,6 +394,9 @@ func parseCommands() error {
 		break
 	case "edit":
 		err = editNote(os.Args[2])
+		break
+	case "search":
+		err = listNotes()
 		break
 	default:
 		err = errors.New("Unknown command")
