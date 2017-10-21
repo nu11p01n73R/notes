@@ -327,8 +327,14 @@ func remove(note string, tags []string) error {
 
 func editNote(note string) error {
 	var err error
+	var noteFile string
 
-	noteFile := fmt.Sprintf("%s/data/%s", noteDir, note)
+	if strings.HasPrefix(note, noteDir) {
+		noteFile = note
+	} else {
+		noteFile = fmt.Sprintf("%s/data/%s", noteDir, note)
+	}
+
 	tempFile := noteDir + "/.new"
 	err = copyFile(noteFile, tempFile)
 	if err != nil {
