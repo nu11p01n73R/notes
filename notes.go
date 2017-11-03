@@ -96,9 +96,9 @@ func initNotes() (string, error) {
 func newNoteTemplate() []byte {
 	content := `[TITLE]
 
-[DESCRIPTION]
-
 [TAGS]
+
+[CONTENT]
 `
 
 	return []byte(content)
@@ -173,13 +173,13 @@ func parseNote(note string) (string, []string, error) {
 
 func saveNewNote(fileName string) (string, error) {
 	today := time.Now().Format("20060102")
-	note := fmt.Sprintf("%s/%s", today, fileName)
+	note := fmt.Sprintf("%s/%s.md", today, fileName)
 
 	outputDir := fmt.Sprintf("%s/data/%s", noteDir, today)
 	createDir(outputDir)
 
-	outputFile := fmt.Sprintf("%s/%s", outputDir, fileName)
-	err := os.Rename(noteDir+"/.new", outputFile)
+	outputFile := fmt.Sprintf("%s/%s.md", outputDir, fileName)
+	err := os.Rename(noteDir+"/.new.md", outputFile)
 
 	return note, err
 }
@@ -209,7 +209,7 @@ func indexTags(noteFile string, tags []string) error {
 }
 
 func newNote() error {
-	newNote := noteDir + "/.new"
+	newNote := noteDir + "/.new.md"
 	err := createNote(newNote)
 	if err != nil {
 		return err
@@ -329,13 +329,15 @@ func editNote(note string) error {
 	var err error
 	var noteFile string
 
+	prefix := fmt.Sprintf("%s/data/", noteDir)
 	if strings.HasPrefix(note, noteDir) {
 		noteFile = note
+		note = strings.TrimLeft(note, prefix)
 	} else {
-		noteFile = fmt.Sprintf("%s/data/%s", noteDir, note)
+		noteFile = fmt.Sprintf("%s%s", prefix, note)
 	}
 
-	tempFile := noteDir + "/.new"
+	tempFile := noteDir + "/.new.md"
 	err = copyFile(noteFile, tempFile)
 	if err != nil {
 		return err
