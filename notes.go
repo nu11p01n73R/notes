@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/nu11p01n73R/fuz/src"
 	"io"
+	"math/rand"
 	"os"
 	"os/exec"
 	"os/user"
@@ -13,8 +14,47 @@ import (
 	"time"
 )
 
+// Path to the parent directory
+// where .notes tree is saved
 var noteDir string
 
+// Generate a random string of length n
+// Gets a random number of 63 bits. Takes
+// the last 6 bits of the random number.
+// Checks if the 6 bits, is less than the
+// length of key string, if yes add the
+// character at the index to output string.
+// Right shift the 6 bits.
+// If the 6 bits is greater than the length,
+// right shift one byte out.
+func getRandomString(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	random := make([]byte, n)
+	mask := 1<<6 - 1
+	num := rand.Int63()
+
+	for i := 0; i < n; {
+		index := int(num) & mask
+		if index < len(letterBytes) {
+			random[i] = letterBytes[index]
+			i++
+			num = num >> 6
+		} else {
+			num = num >> 1
+		}
+
+		if num == 0 {
+			num = rand.Int63()
+		}
+	}
+
+	return string(random)
+}
+
+// Get the home directory of the current
+// user.
+// If getting fails, return error
 func getUserHome() (string, error) {
 	usr, err := user.Current()
 	if err != nil {
@@ -24,6 +64,8 @@ func getUserHome() (string, error) {
 	return usr.HomeDir, nil
 }
 
+// Find the difference between list1 and list2
+// Return the differnece list.
 func listDiff(list1, list2 []string) []string {
 	hash := map[string]bool{}
 	for _, str := range list2 {
@@ -39,6 +81,8 @@ func listDiff(list1, list2 []string) []string {
 	return output
 }
 
+// Checks if a directory exists. If not,
+// create one. Returns an error object.
 func createDir(fileName string) error {
 	_, err := os.Stat(fileName)
 	if os.IsNotExist(err) {
@@ -49,6 +93,8 @@ func createDir(fileName string) error {
 	return err
 }
 
+// Copy file from src to dest.
+// Returns error
 func copyFile(src, dest string) error {
 	input, err := os.Open(src)
 	if err != nil {
@@ -66,6 +112,15 @@ func copyFile(src, dest string) error {
 	return err
 }
 
+// Initialize the notes app.
+// Creats the ./notes directory if not
+// exists with data and tags directories
+// in them.
+// The note directory is created at users
+// home directory
+// TODO Provide functionality to add a
+// differnt notes directory through
+// options or environment variables.
 func initNotes() (string, error) {
 	home, err := getUserHome()
 	if err != nil {
@@ -93,6 +148,7 @@ func initNotes() (string, error) {
 	return noteDir, nil
 }
 
+// Return a template for empty note.
 func newNoteTemplate() []byte {
 	content := `[TITLE]
 
@@ -104,6 +160,9 @@ func newNoteTemplate() []byte {
 	return []byte(content)
 }
 
+// Create a file with newFile name,
+// and write empty note template to it.
+// Returns error
 func createNote(newFile string) error {
 	file, err := os.OpenFile(newFile, os.O_CREATE|os.O_WRONLY, 0754)
 	if err != nil {
@@ -115,6 +174,9 @@ func createNote(newFile string) error {
 	return err
 }
 
+// Open the file in the default editor.
+// Return error
+// TODO error on if  EDITOR is not configured
 func openEditor(file string) error {
 	editor := os.Getenv("EDITOR")
 
@@ -126,11 +188,18 @@ func openEditor(file string) error {
 	return err
 }
 
+// Normaize a string,
+//	Converts to lowerCase
+//	Trims of spaces at start and end
+//	Replace spaces with _
 func normalizeString(str string) string {
 	normalized := strings.Trim(strings.ToLower(str), " ")
 	return strings.Replace(normalized, " ", "_", -1)
 }
 
+// Parse the [TAGS] section of the notes file.
+// Split the tags line to tag elements and normalize them.
+// Returns list of normalized tags.
 func parseTags(tags string) []string {
 	output := []string{}
 	for _, tag := range strings.Split(tags, ",") {
@@ -139,6 +208,9 @@ func parseTags(tags string) []string {
 	return output
 }
 
+// Parse the notes files.
+// Extract the title and list of tags from
+// the file.
 func parseNote(note string) (string, []string, error) {
 	var key, title string
 	tags := []string{}
@@ -171,7 +243,10 @@ func parseNote(note string) (string, []string, error) {
 	return normalizeString(title), tags, nil
 }
 
-func saveNewNote(fileName string) (string, error) {
+// Save the final note file to fileName by moving
+// contents from tempFile to fileName
+// The file is saved in .notes/data/date folder.
+func saveNewNote(tempFile, fileName string) (string, error) {
 	today := time.Now().Format("20060102")
 	note := fmt.Sprintf("%s/%s.md", today, fileName)
 
@@ -179,11 +254,14 @@ func saveNewNote(fileName string) (string, error) {
 	createDir(outputDir)
 
 	outputFile := fmt.Sprintf("%s/%s.md", outputDir, fileName)
-	err := os.Rename(noteDir+"/.new.md", outputFile)
+	err := os.Rename(tempFile, outputFile)
 
 	return note, err
 }
 
+// Save the  file names in corresponding tagFiles
+// If file exists, append to the file. Else create
+// a new file and save the note file it.
 func saveTag(tagFile, noteFile string) error {
 	file, err := os.OpenFile(tagFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0754)
 	if err != nil {
@@ -194,6 +272,8 @@ func saveTag(tagFile, noteFile string) error {
 	return err
 }
 
+// Save the tags for noteFile from
+// the note in corresponding tag files.
 // TODO add go routines to add tags
 func indexTags(noteFile string, tags []string) error {
 	tagDir := noteDir + "/tags"
@@ -208,8 +288,14 @@ func indexTags(noteFile string, tags []string) error {
 	return nil
 }
 
+// Create a new note.
+// A temp file with random name is created
+// with empty template. Open the editor for
+// temp file.
+// Parse and save the notes on exit.
 func newNote() error {
-	newNote := noteDir + "/.new.md"
+	newNote := fmt.Sprintf("%s/.%s.md", noteDir, getRandomString(10))
+
 	err := createNote(newNote)
 	if err != nil {
 		return err
@@ -231,12 +317,13 @@ func newNote() error {
 		return errors.New("Empty title. Skipping the note...")
 	}
 
-	err = save(title, tags)
+	err = save(newNote, title, tags)
 	return err
 }
 
-func save(title string, tags []string) error {
-	noteFile, err := saveNewNote(title)
+// Save the note on tempFile to final file.
+func save(tempFile, title string, tags []string) error {
+	noteFile, err := saveNewNote(tempFile, title)
 	if err != nil {
 		return err
 	}
@@ -245,6 +332,8 @@ func save(title string, tags []string) error {
 	return err
 }
 
+// Remove noteFile from  a tagFile.
+// The file will not be removed if it is emptied.
 func removeTag(tagFile, noteFile string) error {
 	tempFileName := tagFile + ".tmp"
 	tempFile, err := os.OpenFile(tempFileName, os.O_CREATE|os.O_WRONLY, 0754)
@@ -279,6 +368,7 @@ func removeTag(tagFile, noteFile string) error {
 	return err
 }
 
+// Remove all tags of notFile
 // TODO add go routine to remove the files.
 func deindexTags(noteFile string, tags []string) error {
 	tagDir := noteDir + "/tags"
@@ -293,6 +383,11 @@ func deindexTags(noteFile string, tags []string) error {
 	return nil
 }
 
+// Remove a note of name  note.
+// The data file in data directory will
+// be removed.
+// The filename will be removed from all
+// the index files.
 func removeNote(note string) error {
 	noteFile := fmt.Sprintf("%s/data/%s", noteDir, note)
 
@@ -315,16 +410,18 @@ func removeNote(note string) error {
 	return err
 }
 
-func remove(note string, tags []string) error {
-	err := deindexTags(note, tags)
-	if err != nil {
-		return err
-	}
-
-	err = os.Remove(note)
-	return err
-}
-
+// Edit a existing note of name note.
+// The note name can be
+//	Starting from data/date/name
+//	Fully qualified name of the file.
+// The file is moved to a tempFile and
+// opened in editor
+// The file is moved back to data folder
+// in new name or already existing name
+// depending on if title was edited.
+// If [TAGS] was edited, the difference
+// is identied, which is either added
+// or removed from the tag files.
 func editNote(note string) error {
 	var err error
 	var noteFile string
@@ -337,7 +434,7 @@ func editNote(note string) error {
 		noteFile = fmt.Sprintf("%s%s", prefix, note)
 	}
 
-	tempFile := noteDir + "/.new.md"
+	tempFile := fmt.Sprintf("%s/.%s.md", noteDir, getRandomString(10))
 	err = copyFile(noteFile, tempFile)
 	if err != nil {
 		return err
@@ -356,7 +453,7 @@ func editNote(note string) error {
 	}
 
 	if oldTitle != newTitle {
-		err = save(newTitle, newTags)
+		err = save(tempFile, newTitle, newTags)
 		if err != nil {
 			return err
 		}
@@ -382,6 +479,8 @@ func editNote(note string) error {
 	return err
 }
 
+// List all the current notes in the
+// noteDir using Fuz
 func listNotes() error {
 	dataDir := fmt.Sprintf("%s/data", noteDir)
 	cmd := exec.Command("./notes", "edit")
@@ -390,6 +489,8 @@ func listNotes() error {
 	return nil
 }
 
+// Parse the command line argument
+// to identify the command to be used.
 func parseCommands() error {
 	if len(os.Args) == 1 {
 		return errors.New("Not enough arguments")
@@ -420,6 +521,7 @@ func parseCommands() error {
 	return err
 }
 
+// Handle the error.
 func checkError(err error) {
 	if err != nil {
 		fmt.Println(err)
@@ -428,6 +530,8 @@ func checkError(err error) {
 }
 
 func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	var err error
 	noteDir, err = initNotes()
 	checkError(err)
