@@ -8,7 +8,7 @@
 ```
 
 `notes` is a simple note making app written in golang.
-Take notes in markdown with ease on you favourite editor.
+Take notes in markdown with ease on your favourite editor.
 
 # Installation
 
