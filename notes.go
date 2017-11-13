@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"github.com/nu11p01n73R/fuz/src"
 	"io"
@@ -122,12 +123,24 @@ func copyFile(src, dest string) error {
 // differnt notes directory through
 // options or environment variables.
 func initNotes() (string, error) {
-	home, err := getUserHome()
-	if err != nil {
-		return "", err
+	var err error
+	root := flag.String("nd", "", "Notes root directory")
+	flag.Parse()
+
+	if len(*root) == 0 {
+		*root, err = getUserHome()
+		if err != nil {
+			return "", err
+		}
 	}
 
-	noteDir := home + "/.notes"
+	_, err = os.Stat(*root)
+	if os.IsNotExist(err) {
+		msg := fmt.Sprintf("Root directory, %s doesn't exist", *root)
+		return "", errors.New(msg)
+	}
+
+	noteDir := *root + "/.notes"
 	err = createDir(noteDir)
 	if err != nil {
 		return "", err
@@ -492,12 +505,13 @@ func listNotes() error {
 // Parse the command line argument
 // to identify the command to be used.
 func parseCommands() error {
-	if len(os.Args) == 1 {
+	if flag.NArg() != 1 {
 		return errors.New("Not enough arguments")
 	}
 
 	var err error
-	cmd := os.Args[1]
+	cmd := flag.Arg(0)
+
 	switch cmd {
 	case "add":
 		err = newNote()
