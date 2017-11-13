@@ -1,21 +1,40 @@
 # Notes
 
-````
-                 _ __   ___ | |_ ___  ___
-                | '_ \ / _ \| __/ _ \/ __|
-                | | | | (_) | ||  __/\__ \
-                |_| |_|\___/ \__\___||___/
+```
+                         _ __   ___ | |_ ___  ___
+                        | '_ \ / _ \| __/ _ \/ __|
+                        | | | | (_) | ||  __/\__ \
+                        |_| |_|\___/ \__\___||___/
 ```
 
 `notes` is a simple note making app written in golang.
 Take notes in markdown with ease on you favourite editor.
 
+# Installation
+
+Use `go get` to download and install the package,
+
+```
+$ go get github.com/nu11p01n73R/notes
+```
+
+Alternatively, you can also clone the repo,
+
+```
+$ git clone https://github.com/nu11p01n73R/notes
+$ cd notes
+$ go build
+$ ./notes add
+```
+
 # Commands
 
-- `add` Add a new note.
-- `remove notefile` Remove a note.
-- `edit notefile` Edit a note.
-- `search` Use [`fuz`](https://github.com/nu11p01n73R/fuz) to search the notes directory.
+```
+- add                   Add a new note.
+- remove notefile       Remove a note.
+- edit notefile         Edit a note.
+- search                Use [`fuz`](https://github.com/nu11p01n73R/fuz) to search the notes directory.
+```
 
 # Why markdown?
 
